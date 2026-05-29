@@ -138,7 +138,12 @@
   </div>
 
   <script>
-    const assetStr = <?!= asset ?>;
+    // ════════════════════════════════════════════════════════
+    //  CONFIGURATION
+    // ════════════════════════════════════════════════════════
+    // IMPORTANT: Paste your active Google Apps Script Web App URL below
+    // It must end in /exec
+    const GAS_URL = 'PASTE_YOUR_APPS_SCRIPT_URL_HERE';
     
     function fmtDate(d) {
       if (!d) return '—';
@@ -162,12 +167,12 @@
     }
 
     const app = document.getElementById('app');
-    
-    if (!assetStr || assetStr === 'null') {
-      app.innerHTML = '<div class="card empty-state"><h2>Asset Not Found</h2><p>The requested asset could not be found or has been removed from the system.</p></div>';
-    } else {
-      const p = typeof assetStr === 'string' ? JSON.parse(assetStr) : assetStr;
-      
+
+    function renderError(message) {
+      app.innerHTML = `<div class="card empty-state"><h2>Asset Not Found</h2><p>${message}</p></div>`;
+    }
+
+    function renderAsset(p) {
       let historyHtml = '';
       if (p.history && p.history.length > 0) {
         p.history.sort((a,b) => new Date(b.date) - new Date(a.date));
@@ -245,6 +250,41 @@
         </div>
       `;
     }
+
+    async function init() {
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get('id');
+      
+      if (!id) {
+        renderError('No asset ID provided in the URL.');
+        return;
+      }
+      
+      if (GAS_URL === 'PASTE_YOUR_APPS_SCRIPT_URL_HERE') {
+        renderError('Please configure your GAS_URL in AssetView.html before deploying to Cloudflare.');
+        return;
+      }
+
+      app.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);">Loading asset details...</div>';
+
+      try {
+        const response = await fetch(GAS_URL + '?action=getPublicAsset&id=' + encodeURIComponent(id));
+        const json = await response.json();
+        
+        if (!json || !json.ok || !json.data) {
+          renderError('The requested asset could not be found or has been removed from the system.');
+          return;
+        }
+        
+        renderAsset(json.data);
+      } catch (err) {
+        console.error('Fetch Error:', err);
+        renderError('Failed to connect to the database. Please check your internet connection and try again.');
+      }
+    }
+
+    // Start
+    init();
   </script>
 </body>
 </html>
